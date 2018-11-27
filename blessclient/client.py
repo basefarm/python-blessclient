@@ -527,7 +527,10 @@ def get_default_config_filename():
     Returns (str): Full path to file blessclient.cfg in home aws folder
     """
     home_dir = os.path.expanduser("~")
-    return os.path.normpath(os.path.join(home_dir,'.aws','blessclient.cfg'))
+    home_config = os.path.normpath(os.path.join(home_dir,'.aws','blessclient.cfg'))
+    if os.path.isfile(home_config):
+        return home_config
+    return "/etc/blessclient/blessclient.cfg"
 
 def update_config_from_env(bless_config):
     """ Override config values from environment variables
