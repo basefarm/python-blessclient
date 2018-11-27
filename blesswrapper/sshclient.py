@@ -99,4 +99,4 @@ def main():
         for cmd in args.cmd:
             ssh_options.append(cmd)
 
-    subprocess.run(['ssh', hostname]+ssh_options)
+    subprocess.call(['ssh', hostname]+ssh_options)
