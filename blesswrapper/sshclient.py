@@ -5,6 +5,7 @@ import argparse
 import os
 import sys
 import six
+import datetime
 
 from blessclient.client import bless, get_default_config_filename, get_region_from_code, get_regions
 from blessclient.bless_config import BlessConfig
@@ -28,6 +29,12 @@ def main():
     if 'AWS_PROFILE' not in os.environ:
         sys.stderr.write('AWS session not found. Try running get_session first?\n')
         sys.exit(1)
+
+    if 'AWS_EXPIRATION_S' in os.environ:
+        expiration = datetime.datetime.fromtimestamp(int(os.environ['AWS_EXPIRATION_S']))
+        if expiration < datetime.datetime.now():
+            sys.stderr.write('AWS session expired. Try running get_session first?\n')
+            sys.exit(1)
 
     ssh_options = []
     if vars(args)['4']:
@@ -87,6 +94,9 @@ def main():
             break
         except SystemExit:
             pass
+
+    if blessclient_output == []:
+        sys.exit(1)
 
     if 'username' in blessclient_output:
         ssh_options.append('-l')

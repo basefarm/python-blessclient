@@ -812,7 +812,7 @@ def bless(region, nocache, showgui, hostname, bless_config, username = None):
             pass
 
     if role_creds is None:
-        sys.stderr.write('AWS session not found. Try running get_session first?\n')
+        sys.stderr.write('AWS session not working. Check blessclient.cfg and verify the aws session?\n')
         sys.exit(1)
 
     if get_housekeeper_config(region, bless_config) is None:
@@ -976,6 +976,9 @@ def main():
     with open(config_filename, 'r') as f:
         bless_config.set_config(bless_config.parse_config_file(f))
     ca_backend = bless_config.get('BLESS_CONFIG')['ca_backend']
+    if 'AWS_PROFILE' not in os.environ:
+        sys.stderr.write('AWS session not found. Try running get_session first?\n')
+        sys.exit(1)
     if re.match(bless_config.get_client_config()['domain_regex'], args.host) or args.host == 'BLESS':
         start_region = get_region_from_code(args.region, bless_config)
         success = False

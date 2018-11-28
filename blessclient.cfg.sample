@@ -38,8 +38,8 @@ cache_dir: .bless/session
 cache_file: bless_cache.json
 
 # Enable this you want to use AWS credentials from environment variables
-# Default false
-use_env_creds: false
+# Default true
+# use_env_creds: true
 
 # mfa_cache_dir / mfa_cache_file: If you organization has another tool that generates and
 # caches AWS tokens for your users, you can list it here. Blessclient will attempt to use

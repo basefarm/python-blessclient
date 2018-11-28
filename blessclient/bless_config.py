@@ -10,7 +10,7 @@ class BlessConfig(object):
         'update_sshagent': 'true',
         'remote_user': '',
         'ca_backend': 'bless',
-        'use_env_creds': 'false',
+        'use_env_creds': 'true',
     }
 
     def __init__(self):
