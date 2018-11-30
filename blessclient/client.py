@@ -815,6 +815,8 @@ def bless(region, nocache, showgui, hostname, bless_config, username = None):
         sys.stderr.write('AWS session not working. Check blessclient.cfg and verify the aws session?\n')
         sys.exit(1)
 
+    ip_list = None
+    ip = None
     if get_housekeeper_config(region, bless_config) is None:
         ip = None
         if 'bastion_ips' in bless_config.get_aws_config():
@@ -829,8 +831,13 @@ def bless(region, nocache, showgui, hostname, bless_config, username = None):
             if is_valid_ipv4_address(hostname):
                 ip = hostname
             else:
-                ip = socket.gethostbyname(hostname)
-            if ip is not None:
+                bastion_list = housekeeper.getPrivateIpFromPublicName(hostname)
+                if bastion_list is not None:
+                    bastion_list = ','.join(bastion_list)
+                    ip_list = "{},{}".format(my_ip, bastion_list)
+                else:
+                    ip = socket.gethostbyname(hostname)
+            if ip is not None and ip_list is None:
                 if bless_cache.get('remote_ip') == ip:
                     ip_list = bless_cache.get('bastion_ips')
                 else:
@@ -842,7 +849,7 @@ def bless(region, nocache, showgui, hostname, bless_config, username = None):
                             ip_list = "{},{}".format(my_ip, bless_config.get_aws_config()['bastion_ips'])
                         else:
                             ip_list = '{}'.format(my_ip)
-            else:
+            elif ip_list is None:
                 if 'bastion_ips' in bless_config.get_aws_config():
                     ip_list = "{},{}".format(my_ip, bless_config.get_aws_config()['bastion_ips'])
                 else:

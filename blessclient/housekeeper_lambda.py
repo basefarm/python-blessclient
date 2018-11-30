@@ -22,3 +22,9 @@ class HousekeeperLambda(object):
         response = requests.get('{0}/1/get-private-ip-from-public?ip={1}'.format(self.url, ip), auth=auth)
         payload = json.loads(response.content.decode("utf-8"))
         return payload['private_ip']
+
+    def getPrivateIpFromPublicName(self, name):
+        auth = AWSV4Sign(self.credentials, self.region, self.service)
+        response = requests.get('{0}/1/get-private-ip-from-public?name={1}'.format(self.url, name), auth=auth)
+        payload = json.loads(response.content.decode("utf-8"))
+        return payload['private_ips']
