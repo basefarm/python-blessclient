@@ -19,7 +19,7 @@ import json
 import hvac
 import getpass
 import socket
-from pycryptodomex.PublicKey import RSA
+from Cryptodome.PublicKey import RSA
 
 import six
 
