@@ -4,27 +4,62 @@ import subprocess
 import argparse
 import os
 import sys
-import six
 import datetime
 
-from blessclient.client import bless, get_default_config_filename, get_region_from_code, get_regions, download_config_from_s3, load_config
+from blessclient.client import bless, get_region_from_code, get_regions, load_config
 from blessclient.bless_config import BlessConfig
 
 
 def main():
     parser = argparse.ArgumentParser(description='Bless SSH')
     parser.add_argument('host')
-    parser.add_argument('cmd',nargs='*')
+    parser.add_argument('cmd', nargs='*')
     parser.add_argument('--nocache', action='store_true')
-    parser.add_argument('--config', default=None, help='Config file for blessclient. Default to ~/.aws/blessclient.cfg')
-    parser.add_argument('--download_config', action='store_true', help='Download blessclient.cfg from S3 bucket. Will overwrite if file already exist')
-    parser.add_argument('-4', action='store_true', help='Forces ssh to use IPv4 addresses only.')
-    parser.add_argument('-6', action='store_true', help='Forces ssh to use IPv6 addresses only.')
-    parser.add_argument('-a', action='store_true', help='Disable forwarding of the authentication agent connection.')
-    parser.add_argument('-X', action='store_true', help='Enables X11 forwarding.')
-    parser.add_argument('-Y', action='store_true', help='Enables trusted X11 forwarding.')
-    parser.add_argument('-l', default=None, help='Specifies the user to log in as on the remote machine. Defaults to IAM user')
-    parser.add_argument('-p', default=22, help='Port to connect to on the remote host. Default 22')
+    parser.add_argument(
+        '--config',
+        default=None,
+        help='Config file for blessclient. Default to ~/.aws/blessclient.cfg'
+    )
+    parser.add_argument(
+        '--download_config',
+        action='store_true',
+        help='Download blessclient.cfg from S3 bucket. Will overwrite if file already exist'
+    )
+    parser.add_argument(
+        '-4',
+        action='store_true',
+        help='Forces ssh to use IPv4 addresses only.'
+    )
+    parser.add_argument(
+        '-6',
+        action='store_true',
+        help='Forces ssh to use IPv6 addresses only.'
+    )
+    parser.add_argument(
+        '-a',
+        action='store_true',
+        help='Disable forwarding of the authentication agent connection.'
+    )
+    parser.add_argument(
+        '-X',
+        action='store_true',
+        help='Enables X11 forwarding.'
+    )
+    parser.add_argument(
+        '-Y',
+        action='store_true',
+        help='Enables trusted X11 forwarding.'
+    )
+    parser.add_argument(
+        '-l',
+        default=None,
+        help='Specifies the user to log in as on the remote machine. Defaults to IAM user'
+    )
+    parser.add_argument(
+        '-p',
+        default=22,
+        help='Port to connect to on the remote host. Default 22'
+    )
     args = parser.parse_args()
 
     if 'AWS_PROFILE' not in os.environ:
@@ -95,7 +130,7 @@ def main():
     if 'username' in blessclient_output:
         ssh_options.append('-l')
         ssh_options.append(blessclient_output['username'])
-    elif username != None:
+    elif username is not None:
         ssh_options.append('-l')
         ssh_options.append(username)
 
@@ -103,4 +138,4 @@ def main():
         for cmd in args.cmd:
             ssh_options.append(cmd)
 
-    subprocess.call(['ssh', hostname]+ssh_options)
+    subprocess.call(['ssh', hostname] + ssh_options)

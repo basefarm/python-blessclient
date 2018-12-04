@@ -2,7 +2,6 @@
 from __future__ import absolute_import
 import boto3
 from botocore.exceptions import (ClientError,
-                                 ParamValidationError,
                                  ConnectionError,
                                  EndpointConnectionError)
 
@@ -20,6 +19,7 @@ import json
 import hvac
 import getpass
 import socket
+from Crypto.PublicKey import RSA
 
 import six
 
@@ -458,18 +458,32 @@ def ssh_agent_remove_bless(identity_file):
 def ssh_agent_add_bless(identity_file):
     DEVNULL = open(os.devnull, 'w')
     subprocess.check_call(['ssh-add', identity_file], stderr=DEVNULL)
-    current = subprocess.check_output(['ssh-add', '-l']).decode('UTF-8')
-    fingerprint = re.search('SHA256:([^\s]+)',subprocess.check_output(['ssh-keygen', '-lf', identity_file]).decode('UTF-8'))
+    fingerprint = re.search('SHA256:([^\s]+)', subprocess.check_output(['ssh-keygen', '-lf', identity_file]).decode('UTF-8'))
     if fingerprint is None:
         logging.debug("Could not add '{}' to ssh-agent".format(identity_file))
         sys.stderr.write(
             "Couldn't add identity to ssh-agent\n")
         return
     logging.debug("Fingerprint of cert added: {}".format(fingerprint.group(0)))
+    current = subprocess.check_output(['ssh-add', '-l']).decode('UTF-8')
     if not re.search(re.escape(fingerprint.group(0)), current):
         logging.debug("Could not add '{}' to ssh-agent".format(identity_file))
         sys.stderr.write(
             "Couldn't add identity to ssh-agent")
+
+
+def generate_ssh_key(identity_file, public_key_file):
+    sys.stderr.write("Generating ssh key ({} - {})\n".format(identity_file, public_key_file))
+    key = RSA.generate(4096)
+    f = open(identity_file, "wb")
+    os.chmod(identity_file, 0o600)
+    f.write(key.exportKey('PEM'))
+    f.close()
+
+    pubkey = key.publickey()
+    f = open(public_key_file, "wb")
+    f.write(pubkey.exportKey('OpenSSH'))
+    f.close()
 
 
 def get_stderr_feedback():
@@ -522,24 +536,24 @@ def check_fresh_cert(cert_file, blessconfig, bless_cache, userIP, ip_list=None):
     return False
 
 
-def load_config(bless_config, config_filename = None, force_download_config = False, s3_bucket = None):
+def load_config(bless_config, config_file=None, force_download_config=False, s3_bucket=None):
     """
     Returns (boolean):
     """
     if force_download_config:
-        if download_config_from_s3(s3_bucket, config_filename) is False:
+        if download_config_from_s3(s3_bucket, config_file) is False:
             return False
 
-    if config_filename is None:
+    if config_file is None:
         config_filename = get_default_config_filename()
     try:
         with open(config_filename, 'r') as f:
             bless_config.set_config(bless_config.parse_config_file(f))
     except FileNotFoundError as e:
-        if config_filename is None:
+        if config_file is None:
             if download_config_from_s3():
                 home_dir = os.path.expanduser("~")
-                config_filename =  os.path.normpath(os.path.join(home_dir,'.aws','blessclient.cfg'))
+                config_filename = os.path.normpath(os.path.join(home_dir, '.aws', 'blessclient.cfg'))
                 try:
                     with open(config_filename, 'r') as f:
                         bless_config.set_config(bless_config.parse_config_file(f))
@@ -551,21 +565,23 @@ def load_config(bless_config, config_filename = None, force_download_config = Fa
     return True
 
 
-def download_config_from_s3(s3_bucket = None, file_location = None):
+def download_config_from_s3(s3_bucket=None, file_location=None):
     """ Download blessclient.cfg from S3 bucket
     Returns (boolean):
     """
     try:
-        if s3_bucket == None:
+        if s3_bucket is None:
             if 'AWS_PROFILE' not in os.environ:
-                profile = subprocess.check_output(['aws', 'configure', 'get', 'default.session_tool_default_profile']).rstrip().decode('utf-8')
+                profile = subprocess.check_output(
+                    ['aws', 'configure', 'get', 'default.session_tool_default_profile']).rstrip().decode('utf-8')
             else:
                 profile = os.environ['AWS_PROFILE']
-            s3_bucket = subprocess.check_output(['aws', 'configure', 'get', '{}.session-tool_bucketname'.format(profile)]).rstrip().decode('utf-8')
+            s3_bucket = subprocess.check_output(
+                ['aws', 'configure', 'get', '{}.session-tool_bucketname'.format(profile)]).rstrip().decode('utf-8')
 
         if file_location is None:
             home_dir = os.path.expanduser("~")
-            file_location = os.path.normpath(os.path.join(home_dir,'.aws','blessclient.cfg'))
+            file_location = os.path.normpath(os.path.join(home_dir, '.aws', 'blessclient.cfg'))
 
         s3 = boto3.resource('s3')
         s3.meta.client.download_file(s3_bucket, 'blessclient/blessclient.cfg', file_location)
@@ -582,7 +598,7 @@ def get_default_config_filename():
     Returns (str): Full path to file blessclient.cfg
     """
     home_dir = os.path.expanduser("~")
-    home_config = os.path.normpath(os.path.join(home_dir,'.aws','blessclient.cfg'))
+    home_config = os.path.normpath(os.path.join(home_dir, '.aws', 'blessclient.cfg'))
     etc_config = "/etc/blessclient/blessclient.cfg"
     if os.path.isfile(home_config):
         return home_config
@@ -637,6 +653,47 @@ def get_credentials():
     username = six.moves.input()
     password = getpass.getpass(prompt="Password (will be hidden):")
     return username, password
+
+
+def get_env_creds(aws, client_config, kmsauth_config, username, bless_cache, bless_config):
+    if client_config['use_env_creds']:
+        env_vars = {
+            'AWS_SECRET_ACCESS_KEY': 'SecretAccessKey',
+            'AWS_ACCESS_KEY_ID': 'AccessKeyId',
+            'AWS_EXPIRATION_S': 'Expiration',
+            'AWS_SESSION_TOKEN': 'SessionToken'
+        }
+        if all(x in os.environ for x in env_vars):
+            creds = {}
+            for env_var in env_vars.keys():
+                creds[env_vars[env_var]] = os.environ[env_var]
+                if env_var == 'AWS_EXPIRATION_S':
+                    expiration = datetime.datetime.fromtimestamp(int(os.environ[env_var]))
+                    creds[env_vars[env_var]] = expiration.strftime(DATETIME_STRING_FORMAT)
+            if expiration < datetime.datetime.now():
+                creds = None
+        try:
+            # Try doing this with our env's creds
+            kmsauth_token = get_kmsauth_token(
+                None,
+                kmsauth_config,
+                username,
+                cache=bless_cache
+            )
+            logging.debug(
+                "Got kmsauth token by env creds: {}".format(kmsauth_token))
+            role_creds = get_blessrole_credentials(
+                aws.iam_client(), creds, bless_config, bless_cache)
+            logging.debug("Env creds used to assume role use-bless")
+        except Exception as e:
+            logging.debug('Failed to use env creds: {}'.format(e))
+            pass
+
+    if role_creds is None:
+        sys.stderr.write('AWS session not working. Check blessclient.cfg and verify the aws session?\n')
+        return None
+
+    return [creds, role_creds, kmsauth_token]
 
 
 def auth_okta(client, auth_mount, bless_cache):
@@ -800,7 +857,7 @@ def vault_bless(nocache, bless_config):
         sys.stderr.write("Finished getting certificate.\n")
 
 
-def bless(region, nocache, showgui, hostname, bless_config, username = None):
+def bless(region, nocache, showgui, hostname, bless_config, username=None):
     # Setup loggging
     setup_logging()
     show_feedback = get_stderr_feedback()
@@ -835,44 +892,8 @@ def bless(region, nocache, showgui, hostname, bless_config, username = None):
 
     role_creds = None
     kmsauth_config = get_kmsauth_config(region, bless_config)
-
     client_config = bless_config.get_client_config()
-    if client_config['use_env_creds']:
-        env_vars = {
-            'AWS_SECRET_ACCESS_KEY': 'SecretAccessKey',
-            'AWS_ACCESS_KEY_ID': 'AccessKeyId',
-            'AWS_EXPIRATION_S': 'Expiration',
-            'AWS_SESSION_TOKEN': 'SessionToken'
-        }
-        if all(x in os.environ for x in env_vars):
-            creds = {}
-            for env_var in env_vars.keys():
-                creds[env_vars[env_var]] = os.environ[env_var]
-                if env_var == 'AWS_EXPIRATION_S':
-                    expiration = datetime.datetime.fromtimestamp(int(os.environ[env_var]))
-                    creds[env_vars[env_var]] = expiration.strftime(DATETIME_STRING_FORMAT)
-            if expiration < datetime.datetime.now():
-                creds = None
-        try:
-            # Try doing this with our env's creds
-            kmsauth_token = get_kmsauth_token(
-                None,
-                kmsauth_config,
-                username,
-                cache=bless_cache
-            )
-            logging.debug(
-                "Got kmsauth token by env creds: {}".format(kmsauth_token))
-            role_creds = get_blessrole_credentials(
-                aws.iam_client(), creds, bless_config, bless_cache)
-            logging.debug("Env creds used to assume role use-bless")
-        except Exception as e:
-            logging.debug('Failed to use env creds: {}'.format(e))
-            pass
-
-    if role_creds is None:
-        sys.stderr.write('AWS session not working. Check blessclient.cfg and verify the aws session?\n')
-        sys.exit(1)
+    creds, role_creds, kmsauth_token = get_env_creds(aws, client_config, kmsauth_config, username, bless_cache, bless_config)
 
     ip_list = None
     ip = None
@@ -938,8 +959,13 @@ def bless(region, nocache, showgui, hostname, bless_config, username = None):
             + " (set BLESSQUIET=1 to suppress these messages)\n"
         )
     public_key_file = identity_file + '.pub'
-    with open(public_key_file, 'r') as f:
-        public_key = f.read()
+    try:
+        with open(public_key_file, 'r') as f:
+            public_key = f.read()
+    except FileNotFoundError as e:
+        generate_ssh_key(identity_file, public_key_file)
+        with open(public_key_file, 'r') as f:
+            public_key = f.read()
 
     if public_key[:8] != 'ssh-rsa ':
         raise Exception(
@@ -1033,9 +1059,9 @@ def main():
     )
     parser.add_argument(
         '--download_config',
-        action='store_true',
-        help=
-            ('Download blessclient.cfg from S3 bucket. Will overwrite if file already exist')
+        help=(
+            'Download blessclient.cfg from S3 bucket. Will overwrite if file already exist'),
+        action='store_true'
     )
     args = parser.parse_args()
     bless_config = BlessConfig()

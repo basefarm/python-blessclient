@@ -94,7 +94,7 @@ BASE_EXPECTED_CONF = {
         'user_session_length': 3600,
         'usebless_role_session_length': 3600, # comes from BlessConfig.DEFAULT_CONFIG
         'update_sshagent': False,
-        'use_env_creds': False # comes from BlessConfig.DEFAULT_CONFIG
+        'use_env_creds': True # comes from BlessConfig.DEFAULT_CONFIG
     }
 }
 

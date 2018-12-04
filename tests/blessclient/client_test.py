@@ -147,10 +147,15 @@ def test_uncache_creds():
     assert creds['token'] == returned['token']
     assert returned['Expiration'] < time.gmtime()
 
+def outputmock_sideeffect(*args, **kwargs):
+    if args[0][0] == 'ssh-keygen':
+        return b'4096 SHA256:hwnh3ccCcxVUo6T6htWvHdkCx/UsNklwy2uQuiBaTLQ /Users/foobar/.ssh/blessid (RSA-CERT)'
+    elif args[0][0] == 'ssh-add':
+        return b'4096 SHA256:hwnh3ccCcxVUo6T6htWvHdkCx/UsNklwy2uQuiBaTLQ /Users/foobar/.ssh/blessid (RSA-CERT)'
 
 def test_ssh_agent_remove_bless(mocker):
     outputmock = mocker.patch('subprocess.check_output')
-    outputmock.return_value = b'4096 SHA256:hwnh3ccCcxVUo6T6htWvHdkCx/UsNklwy2uQuiBaTLQ /Users/foobar/.ssh/blessid (RSA-CERT)'
+    outputmock.side_effect = outputmock_sideeffect
     callmock = mocker.patch('subprocess.check_call')
     client.ssh_agent_remove_bless('blessid')
     outputmock.assert_called_once()
@@ -159,10 +164,10 @@ def test_ssh_agent_remove_bless(mocker):
 
 def test_ssh_agent_add_bless(mocker):
     outputmock = mocker.patch('subprocess.check_output')
-    outputmock.return_value = b'4096 SHA256:hwnh3ccCcxVUo6T6htWvHdkCx/UsNklwy2uQuiBaTLQ /Users/foobar/.ssh/blessid (RSA-CERT)'
+    outputmock.side_effect = outputmock_sideeffect
     callmock = mocker.patch('subprocess.check_call')
     client.ssh_agent_add_bless('.ssh/blessid')
-    outputmock.assert_called_once()
+    outputmock.assert_called()
     callmock.assert_called_once()
 
 
