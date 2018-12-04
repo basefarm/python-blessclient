@@ -10,7 +10,8 @@ setup(
         'kmsauth>=0.1.8',
         'six',
         'hvac',
-        'requests_aws_sign'
+        'requests_aws_sign',
+        'pycryptodomex'
     ],
     author="Chris Steipp",
     author_email="csteipp@lyft.com",
