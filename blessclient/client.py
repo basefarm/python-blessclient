@@ -522,15 +522,74 @@ def check_fresh_cert(cert_file, blessconfig, bless_cache, userIP, ip_list=None):
     return False
 
 
+def load_config(bless_config, config_filename = None, force_download_config = False, s3_bucket = None):
+    """
+    Returns (boolean):
+    """
+    if force_download_config:
+        if download_config_from_s3(s3_bucket, config_filename) is False:
+            return False
+
+    if config_filename is None:
+        config_filename = get_default_config_filename()
+    try:
+        with open(config_filename, 'r') as f:
+            bless_config.set_config(bless_config.parse_config_file(f))
+    except FileNotFoundError as e:
+        if config_filename is None:
+            if download_config_from_s3():
+                home_dir = os.path.expanduser("~")
+                config_filename =  os.path.normpath(os.path.join(home_dir,'.aws','blessclient.cfg'))
+                try:
+                    with open(config_filename, 'r') as f:
+                        bless_config.set_config(bless_config.parse_config_file(f))
+                except FileNotFoundError:
+                    pass
+        if bless_config.get_config() is None:
+            sys.stderr.write('{}\n'.format(e))
+            return False
+    return True
+
+
+def download_config_from_s3(s3_bucket = None, file_location = None):
+    """ Download blessclient.cfg from S3 bucket
+    Returns (boolean):
+    """
+    try:
+        if s3_bucket == None:
+            if 'AWS_PROFILE' not in os.environ:
+                profile = subprocess.check_output(['aws', 'configure', 'get', 'default.session_tool_default_profile']).rstrip().decode('utf-8')
+            else:
+                profile = os.environ['AWS_PROFILE']
+            s3_bucket = subprocess.check_output(['aws', 'configure', 'get', '{}.session-tool_bucketname'.format(profile)]).rstrip().decode('utf-8')
+
+        if file_location is None:
+            home_dir = os.path.expanduser("~")
+            file_location = os.path.normpath(os.path.join(home_dir,'.aws','blessclient.cfg'))
+
+        s3 = boto3.resource('s3')
+        s3.meta.client.download_file(s3_bucket, 'blessclient/blessclient.cfg', file_location)
+        sys.stderr.write('Downloaded blessclient.cfg from {} to {}\n'.format(s3_bucket, file_location))
+        return True
+    except Exception as e:
+        sys.stderr.write('S3: {}\n'.format(e))
+        sys.stderr.write('Failed to download blessclient.cfg from {}/{}\n'.format(s3_bucket, 'blessclient/blessclient.cfg'))
+        return False
+
+
 def get_default_config_filename():
-    """ Get the full path to the default config file
-    Returns (str): Full path to file blessclient.cfg in home aws folder
+    """ Get the full path to the default config file. /etc/blessclient or ~/.aws/blessclient.cfg
+    Returns (str): Full path to file blessclient.cfg
     """
     home_dir = os.path.expanduser("~")
     home_config = os.path.normpath(os.path.join(home_dir,'.aws','blessclient.cfg'))
+    etc_config = "/etc/blessclient/blessclient.cfg"
     if os.path.isfile(home_config):
         return home_config
-    return "/etc/blessclient/blessclient.cfg"
+    if os.path.isfile(etc_config):
+        return etc_config
+    return home_config
+
 
 def update_config_from_env(bless_config):
     """ Override config values from environment variables
@@ -962,11 +1021,6 @@ def main():
         default=None
     )
     parser.add_argument(
-        '--nocache',
-        help=('Don\'t use cached credentials'),
-        action='store_true'
-    )
-    parser.add_argument(
         '--gui',
         help=(
             'If you need to input your AWS MFA token, use a gui (useful for interupting ssh)'),
@@ -977,11 +1031,17 @@ def main():
         help=(
             'Config file for blessclient, defaults to blessclient.cfg')
     )
+    parser.add_argument(
+        '--download_config',
+        action='store_true',
+        help=
+            ('Download blessclient.cfg from S3 bucket. Will overwrite if file already exist')
+    )
     args = parser.parse_args()
     bless_config = BlessConfig()
-    config_filename = args.config if args.config else get_default_config_filename()
-    with open(config_filename, 'r') as f:
-        bless_config.set_config(bless_config.parse_config_file(f))
+    if load_config(bless_config, args.config, args.download_config) is False:
+        sys.exit(1)
+
     ca_backend = bless_config.get('BLESS_CONFIG')['ca_backend']
     if 'AWS_PROFILE' not in os.environ:
         sys.stderr.write('AWS session not found. Try running get_session first?\n')
@@ -995,7 +1055,7 @@ def main():
                     vault_bless(args.nocache, bless_config)
                     success = True
                 elif ca_backend.lower() == 'bless':
-                    bless(region, args.nocache, args.gui, args.host, bless_config)
+                    bless(region, True, args.gui, args.host, bless_config)
                     success = True
                 else:
                     sys.stderr.write('{0} is an invalid CA backend'.format(ca_backend))

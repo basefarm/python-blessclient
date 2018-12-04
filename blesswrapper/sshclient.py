@@ -7,7 +7,7 @@ import sys
 import six
 import datetime
 
-from blessclient.client import bless, get_default_config_filename, get_region_from_code, get_regions
+from blessclient.client import bless, get_default_config_filename, get_region_from_code, get_regions, download_config_from_s3, load_config
 from blessclient.bless_config import BlessConfig
 
 
@@ -17,6 +17,7 @@ def main():
     parser.add_argument('cmd',nargs='*')
     parser.add_argument('--nocache', action='store_true')
     parser.add_argument('--config', default=None, help='Config file for blessclient. Default to ~/.aws/blessclient.cfg')
+    parser.add_argument('--download_config', action='store_true', help='Download blessclient.cfg from S3 bucket. Will overwrite if file already exist')
     parser.add_argument('-4', action='store_true', help='Forces ssh to use IPv4 addresses only.')
     parser.add_argument('-6', action='store_true', help='Forces ssh to use IPv6 addresses only.')
     parser.add_argument('-a', action='store_true', help='Disable forwarding of the authentication agent connection.')
@@ -75,15 +76,8 @@ def main():
 
     blessclient_output = []
     bless_config = BlessConfig()
-    if args.config is not None:
-        config_filename = args.config
-    else:
-        config_filename = get_default_config_filename()
-    try:
-        with open(config_filename, 'r') as f:
-            bless_config.set_config(bless_config.parse_config_file(f))
-    except FileNotFoundError as e:
-        sys.stderr.write('{}\n'.format(e))
+
+    if load_config(bless_config, args.config, args.download_config) is False:
         sys.exit(1)
 
     start_region = get_region_from_code(None, bless_config)
