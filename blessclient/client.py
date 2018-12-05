@@ -661,6 +661,7 @@ def get_credentials():
 
 
 def get_env_creds(aws, client_config, kmsauth_config, username, bless_cache, bless_config):
+    role_creds = None
     if client_config['use_env_creds']:
         env_vars = {
             'AWS_SECRET_ACCESS_KEY': 'SecretAccessKey',
@@ -695,8 +696,7 @@ def get_env_creds(aws, client_config, kmsauth_config, username, bless_cache, ble
             pass
 
     if role_creds is None:
-        sys.stderr.write('AWS session not working. Check blessclient.cfg and verify the aws session?\n')
-        return None
+        return [None, None, None]
 
     return [creds, role_creds, kmsauth_token]
 
@@ -900,6 +900,10 @@ def bless(region, nocache, showgui, hostname, bless_config, username=None):
     client_config = bless_config.get_client_config()
     creds, role_creds, kmsauth_token = get_env_creds(aws, client_config, kmsauth_config, username, bless_cache, bless_config)
 
+    if role_creds is None:
+        sys.stderr.write('AWS session not working. Check blessclient.cfg and verify the aws session?\n')
+        sys.exit(1)
+
     ip_list = None
     ip = None
     if get_housekeeper_config(region, bless_config) is None:
@@ -1044,7 +1048,8 @@ def main():
     )
     parser.add_argument(
         'host',
-        help=('Host name to which we are connecting')
+        help=('Host name to which we are connecting'),
+        nargs='*'
     )
     parser.add_argument(
         '--region',
@@ -1070,14 +1075,22 @@ def main():
     )
     args = parser.parse_args()
     bless_config = BlessConfig()
+
+    if len(args.host) == 0 and args.download_config is False:
+        sys.stderr.write('blessclient: error: the following arguments are required: host\n')
+        sys.exit(1)
+
     if load_config(bless_config, args.config, args.download_config) is False:
         sys.exit(1)
+
+    if len(args.host) < 1:
+        sys.exit(0)
 
     ca_backend = bless_config.get('BLESS_CONFIG')['ca_backend']
     if 'AWS_PROFILE' not in os.environ:
         sys.stderr.write('AWS session not found. Try running get_session first?\n')
         sys.exit(1)
-    if re.match(bless_config.get_client_config()['domain_regex'], args.host) or args.host == 'BLESS':
+    if re.match(bless_config.get_client_config()['domain_regex'], args.host[0]) or args.host[0] == 'BLESS':
         start_region = get_region_from_code(args.region, bless_config)
         success = False
         for region in get_regions(start_region, bless_config):
@@ -1086,7 +1099,7 @@ def main():
                     vault_bless(args.nocache, bless_config)
                     success = True
                 elif ca_backend.lower() == 'bless':
-                    bless(region, True, args.gui, args.host, bless_config)
+                    bless(region, True, args.gui, args.host[0], bless_config)
                     success = True
                 else:
                     sys.stderr.write('{0} is an invalid CA backend'.format(ca_backend))
