@@ -473,6 +473,11 @@ def ssh_agent_add_bless(identity_file):
 
 
 def generate_ssh_key(identity_file, public_key_file):
+    ssh_folder = os.path.dirname(identity_file)
+    if not os.path.exists(ssh_folder):
+        sys.stderr.write("Creating folder {}\n".format(ssh_folder))
+        os.makedirs(ssh_folder)
+
     sys.stderr.write("Generating ssh key ({} - {})\n".format(identity_file, public_key_file))
     key = RSA.generate(4096)
     f = open(identity_file, "wb")
