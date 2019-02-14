@@ -1048,12 +1048,14 @@ def main():
     )
     parser.add_argument(
         'host',
-        help=('Host name to which we are connecting'),
+        help=(
+            'Host name to which we are connecting'),
         nargs='*'
     )
     parser.add_argument(
         '--region',
-        help=('Region to which you want the lambda to connect to. Defaults to first region in config'),
+        help=(
+            'Region to which you want the lambda to connect to. Defaults to first region in config'),
         default=None
     )
     parser.add_argument(

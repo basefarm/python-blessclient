@@ -58,7 +58,8 @@ class UserIP(object):
                         if c not in VALID_IP_CHARACTERS:
                             raise ValueError("Public IP response included invalid character '{}'.".format(c))
                     return content
-        except Exception:
+        except Exception as e:
+            logging.debug(e)
             logging.debug('Could not refresh public IP from {}'.format(url), exc_info=True)
 
         return None

@@ -5,6 +5,7 @@ import argparse
 import os
 import sys
 import datetime
+import re
 
 from blessclient.client import bless, get_region_from_code, get_regions, load_config
 from blessclient.bless_config import BlessConfig
@@ -60,6 +61,11 @@ def main():
         default=22,
         help='Port to connect to on the remote host. Default 22'
     )
+    parser.add_argument(
+        '-F',
+        default=None,
+        help='Specifies an alternative per-user configuration file for ssh.'
+    )
     args = parser.parse_args()
 
     if 'AWS_PROFILE' not in os.environ:
@@ -71,6 +77,18 @@ def main():
         if expiration < datetime.datetime.now():
             sys.stderr.write('AWS session expired. Try running get_session first?\n')
             sys.exit(1)
+
+    try:
+        ssh_version = re.search('OpenSSH_([^\s]+)', subprocess.check_output(['ssh', '-V'], stderr=subprocess.STDOUT).decode('UTF-8'))
+        if '7.8' in ssh_version.group(0):
+            sys.stderr.write("""@@@@@@@ WARNING @@@@@@@
+There is a bug in OpenSSH version 7.8 that makes signed ssh keys not work, and thus Bless does not work.
+From our knowledge, the bug only affects the ssh client.
+sshd version 7.7 or 7.9 should work with Bless.
+We detected that you are running {}
+""".format(ssh_version.group(0))+'\n'+'-'*64)
+    except Exception as e:
+        sys.stderr.write('Failed to get OpenSSH client version\n')
 
     ssh_options = []
     if vars(args)['4']:
@@ -86,6 +104,9 @@ def main():
         ssh_options.append('-X')
     if args.Y:
         ssh_options.append('-Y')
+    if args.F is not None:
+        ssh_options.append('-F')
+        ssh_options.append(args.F)
 
     hostname = None
     username = None
