@@ -3,7 +3,9 @@ import contextlib
 import logging
 import string
 import time
-from six.moves.urllib_request import urlopen
+import socket
+import requests
+from urllib.parse import urlparse
 
 VALID_IP_CHARACTERS = string.hexdigits + '.:'
 
@@ -51,13 +53,19 @@ class UserIP(object):
 
     def _fetchIP(self, url):
         try:
-            with contextlib.closing(urlopen(url, timeout=2)) as f:
-                if f.getcode() == 200:
-                    content = f.read().decode().strip()[:40]
-                    for c in content:
-                        if c not in VALID_IP_CHARACTERS:
-                            raise ValueError("Public IP response included invalid character '{}'.".format(c))
-                    return content
+            # We do this to force IPv4 lookup as bless do not currently support IPv6
+            parsed_uri = urlparse(url)
+            addrs = socket.gethostbyname(parsed_uri.netloc)
+            headers = { 'Host' : parsed_uri.netloc }
+            r = requests.get('{}://{}{}'.format(parsed_uri.scheme, addrs, parsed_uri.path), headers=headers)
+            if r.status_code == 200:
+                content = r.text.strip()
+                for c in content:
+                    if c not in VALID_IP_CHARACTERS:
+                        print(content)
+                        raise ValueError("Public IP response included invalid character '{}'.".format(c))
+                logging.debug('Public IP is {}'.format(content))
+                return content
         except Exception as e:
             logging.debug(e)
             logging.debug('Could not refresh public IP from {}'.format(url), exc_info=True)

@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="blessclient",
-    version="0.4.1",
+    version="0.4.2",
     packages=find_packages(exclude=["test*"]),
     install_requires=[
         'boto3>=1.4.0,<2.0.0',
@@ -11,13 +11,14 @@ setup(
         'six',
         'hvac',
         'requests_aws_sign',
-        'pycryptodomex'
+        'pycryptodomex',
+        'requests'
     ],
     author="Chris Steipp",
     author_email="csteipp@lyft.com",
-    description="Issue temporary certificates for ssh, signed by the Netflix BLESS lambda.",
+    description="Basefarm modified blessclient. Forked from lyft",
     license="apache2",
-    url="https://github.com/lyft/python-blessclient",
+    url="https://github.com/basefarm/python-blessclient",
     entry_points={
         "console_scripts": [
             "blessclient = blessclient.client:main",

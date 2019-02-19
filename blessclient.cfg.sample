@@ -51,7 +51,7 @@ mfa_cache_file: token_cache.json
 # ip_urls: comma-separated list of urls that can provide a user's public IP address. This
 # IP will be added as an authorized IP to the user's certificate, preventing a stolen
 # SSH certificate from being used by another IP.
-ip_urls: http://api.ipify.org, http://canihazip.com
+ip_urls: http://api.ipify.org, http://ifconfig.co/ip, http://canihazip.com/s
 
 # update_script: This script will be called after 7 days of use, so you can push updates
 # to your users. Your update script should use some mechanism to verify the integrity of
