@@ -541,21 +541,21 @@ def check_fresh_cert(cert_file, blessconfig, bless_cache, userIP, ip_list=None):
     return False
 
 
-def load_config(bless_config, config_file=None, force_download_config=False, s3_bucket=None):
+def load_config(bless_config, config_filename=None, force_download_config=False, s3_bucket=None):
     """
     Returns (boolean):
     """
     if force_download_config:
-        if download_config_from_s3(s3_bucket, config_file) is False:
+        if download_config_from_s3(s3_bucket, config_filename) is False:
             return False
 
-    if config_file is None:
+    if config_filename is None:
         config_filename = get_default_config_filename()
     try:
         with open(config_filename, 'r') as f:
             bless_config.set_config(bless_config.parse_config_file(f))
     except FileNotFoundError as e:
-        if config_file is None:
+        if config_filename is None:
             if download_config_from_s3():
                 home_dir = os.path.expanduser("~")
                 config_filename = os.path.normpath(os.path.join(home_dir, '.aws', 'blessclient.cfg'))
